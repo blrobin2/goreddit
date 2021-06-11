@@ -47,7 +47,7 @@ const threadListHTML = `
 	</li>
 {{end}}
 </ul>
-<a href="/threads/new">Create New Thread</a>
+<a href="/threads/new">Create New Threadz</a>
 <script>
 	function handleDelete(id) {
 		return fetch("/threads/" + id, {
