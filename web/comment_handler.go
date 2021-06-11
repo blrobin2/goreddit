@@ -56,12 +56,8 @@ func voteOnComment(h *CommentHandler, newVoteAmount int) http.HandlerFunc {
 			return
 		}
 
-		if err := h.store.UpdateComment(&goreddit.Comment{
-			ID:      c.ID,
-			PostID:  c.PostID,
-			Content: c.Content,
-			Votes:   c.Votes + newVoteAmount,
-		}); err != nil {
+		c.Votes += newVoteAmount
+		if err := h.store.UpdateComment(&c); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

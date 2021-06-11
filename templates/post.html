@@ -38,9 +38,9 @@
 <div class="card mb-4 px-4">
     {{range .Comments}}
     <div class="d-flex my-4">
-        <div class="text-center flex-shrink-0" style="width: 2rem">
+        <div class="flex-shrink-0" style="width: 4rem">
             <button data-comment-id="{{.ID}}" class="d-block text-body btn btn-outline-default upvote">&#x25B2</button>
-            <div class="pl-3">{{.Votes}}</div>
+            <div class="mt-1 pl-3">{{.Votes}}</div>
             <button data-comment-id="{{.ID}}" class="d-block text-body btn btn-outline-default downvote">&#x25BC</button>
         </div>
         <div class="pl-4 mt-2">

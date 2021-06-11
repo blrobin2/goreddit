@@ -122,13 +122,8 @@ func voteOnPost(h *PostHandler, newVoteAmount int) http.HandlerFunc {
 			return
 		}
 
-		if err := h.store.UpdatePost(&goreddit.Post{
-			ID:       p.ID,
-			ThreadID: p.ThreadID,
-			Title:    p.Title,
-			Content:  p.Content,
-			Votes:    p.Votes + newVoteAmount,
-		}); err != nil {
+		p.Votes += newVoteAmount
+		if err := h.store.UpdatePost(&p); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
