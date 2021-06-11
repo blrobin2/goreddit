@@ -1,8 +1,8 @@
 package web
 
 import (
+	"html/template"
 	"net/http"
-	"text/template"
 
 	"github.com/blrobin2/goreddit"
 	"github.com/go-chi/chi/v5"
@@ -18,11 +18,17 @@ func NewHandler(store goreddit.Store) *Handler {
 
 	h.Use(middleware.Logger)
 
+	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
 		r.Get("/", h.ThreadsList())
 		r.Get("/new", h.NewThread())
 		r.Post("/", h.CreateThread())
+		r.Get("/{id}", h.ShowThread())
 		r.Delete("/{id}", h.DeleteThread())
+
+		r.Get("/{id}/new", h.NewPost())
+		r.Post("/{id}", h.CreatePost())
+		r.Get("/{threadID}/{postID}", h.ShowPost())
 	})
 
 	return h
@@ -34,36 +40,18 @@ type Handler struct {
 	store goreddit.Store
 }
 
-const threadListHTML = `
-<h1>Threads</h1>
-<ul>
-{{range .Threads}}
-	<li>
-		<h3>{{.Title}}</h3>
-		<p>{{.Description}}</p>
-		<p>
-			<button onclick="handleDelete('{{.ID}}')">Delete</button>
-		</p>
-	</li>
-{{end}}
-</ul>
-<a href="/threads/new">Create New Threadz</a>
-<script>
-	function handleDelete(id) {
-		return fetch("/threads/" + id, {
-			method: 'DELETE',
-		}).then(res => {
-			window.location.reload();
-		});
+func (h *Handler) Home() http.HandlerFunc {
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		templ.Execute(w, nil)
 	}
-</script>
-`
+}
 
 func (h *Handler) ThreadsList() http.HandlerFunc {
 	type data struct {
 		Threads []goreddit.Thread
 	}
-	templ := template.Must(template.New("").Parse(threadListHTML))
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/threads.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		ts, err := h.store.Threads()
 		if err != nil {
@@ -75,31 +63,40 @@ func (h *Handler) ThreadsList() http.HandlerFunc {
 	}
 }
 
-const newThreadHTML = `
-<h1>New thread</h1>
-<form action="/threads" method="POST">
-	<p>
-		<label for="title">Title</label>
-		<input type="text" name="title" id="title" />
-	</p>
-
-	<p>
-		<label for="description">Description</label>
-		<textarea name="description" id="description"></textarea>
-	</p>
-
-	<p>
-		<button type="submit">
-			Create Thread
-		</button>
-	</p>
-</form>
-`
-
 func (h *Handler) NewThread() http.HandlerFunc {
-	templ := template.Must(template.New("").Parse(newThreadHTML))
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/thread_create.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		templ.Execute(w, nil)
+	}
+}
+
+func (h *Handler) ShowThread() http.HandlerFunc {
+	type data struct {
+		Thread goreddit.Thread
+		Posts  []goreddit.Post
+	}
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/thread.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := getId(r, "id")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		t, err := h.store.Thread(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ps, err := h.store.PostsByThead(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		templ.Execute(w, data{
+			Thread: t,
+			Posts:  ps,
+		})
 	}
 }
 
@@ -123,8 +120,7 @@ func (h *Handler) CreateThread() http.HandlerFunc {
 
 func (h *Handler) DeleteThread() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-		id, err := uuid.Parse(idStr)
+		id, err := getId(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -137,4 +133,105 @@ func (h *Handler) DeleteThread() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func (h *Handler) NewPost() http.HandlerFunc {
+	type data struct {
+		Thread goreddit.Thread
+	}
+
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/post_create.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := getId(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		t, err := h.store.Thread(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		templ.Execute(w, data{
+			Thread: t,
+		})
+	}
+}
+
+func (h *Handler) ShowPost() http.HandlerFunc {
+	type data struct {
+		Thread   goreddit.Thread
+		Post     goreddit.Post
+		Comments []goreddit.Comment
+	}
+	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/post.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		threadID, err := getId(r, "threadID")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		postID, err := getId(r, "postID")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		t, err := h.store.Thread(threadID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		p, err := h.store.Post(postID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		cs, err := h.store.CommentsByPost(postID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		templ.Execute(w, data{
+			Thread:   t,
+			Post:     p,
+			Comments: cs,
+		})
+	}
+}
+
+func (h *Handler) CreatePost() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := getId(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		title := r.FormValue("title")
+		content := r.FormValue("content")
+
+		p := &goreddit.Post{
+			ID:       uuid.New(),
+			ThreadID: id,
+			Title:    title,
+			Content:  content,
+		}
+		if err := h.store.CreatePost(p); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/threads/"+id.String()+"/"+p.ID.String(), http.StatusFound)
+	}
+}
+
+func getId(r *http.Request, idName string) (uuid.UUID, error) {
+	idStr := chi.URLParam(r, idName)
+	return uuid.Parse(idStr)
 }

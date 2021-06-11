@@ -23,7 +23,7 @@ func (s *CommentStore) Comment(id uuid.UUID) (goreddit.Comment, error) {
 
 func (s *CommentStore) CommentsByPost(postID uuid.UUID) ([]goreddit.Comment, error) {
 	var ps []goreddit.Comment
-	if err := s.Select(&ps, `SELECT * FROM comments WHERE thread_id = $1`, postID); err != nil {
+	if err := s.Select(&ps, `SELECT * FROM comments WHERE post_id = $1`, postID); err != nil {
 		return []goreddit.Comment{}, fmt.Errorf("error getting comments: %w", err)
 	}
 
