@@ -3,7 +3,7 @@
 <div class="row">
     <div class="col-xl-8">
 
-        <a href="/threads/{{.Thread.ID}}" class="text-secondary mb-2 mt-2 d-flex align-items-center">
+        <a href="/threads/{{.Post.ThreadID}}" class="text-secondary mb-2 mt-2 d-flex align-items-center">
             <svg viewBox="0 0 8 16" width="8" height="16" fill="currentColor">
                 <path fill-rule="evenodd" d="M5.5 3L7 4.5 3.25 8 7 11.5 5.5 13l-5-5 5-5z"></path>
             </svg>
@@ -20,7 +20,7 @@
 {{define "content"}}
 <div class="card mb-4">
     <div class="text-right">
-        <form>
+        <form action="/posts/{{.Post.ID}}" method="POST">
             <label class="sr-only" for="content">Content</label>
             <textarea
                 id="content"
@@ -38,17 +38,32 @@
 <div class="card mb-4 px-4">
     {{range .Comments}}
     <div class="d-flex my-4">
-        <div class="text-center flex-shrink-0" style="width: 1.5rem">
-            <a href="#" class="d-block text-body text-decoration-none">&#x25B2</a>
-            <div>{{.Votes}}</div>
-            <a href="#" class="d-block text-body text-decoration-none">&#x25BC</a>
+        <div class="text-center flex-shrink-0" style="width: 2rem">
+            <button data-comment-id="{{.ID}}" class="d-block text-body btn btn-outline-default upvote">&#x25B2</button>
+            <div class="pl-3">{{.Votes}}</div>
+            <button data-comment-id="{{.ID}}" class="d-block text-body btn btn-outline-default downvote">&#x25BC</button>
         </div>
-        <div class="pl-4">
-            <p class="card-text">
-                {{.Content}}
-            </p>
+        <div class="pl-4 mt-2">
+            <p class="card-text" style="white-space: pre-line;">{{.Content}}</p>
         </div>
     </div>
     {{end}}
 </div>
+{{end}}
+
+{{define "javascript"}}
+<script>
+    ['upvote', 'downvote'].forEach(voteType => {
+        for (let button of document.getElementsByClassName(voteType)) {
+            button.addEventListener('click', (event) => {
+                const id = event.target.dataset.commentId;
+                fetch(`/comments/${id}/${voteType}`, {
+                    method: 'POST'
+                }).then(() => {
+                    window.location.reload();
+                });
+            });
+        }
+    });
+</script>
 {{end}}

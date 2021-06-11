@@ -3,6 +3,7 @@ package web
 import (
 	"html/template"
 	"net/http"
+	"sort"
 
 	"github.com/blrobin2/goreddit"
 	"github.com/go-chi/chi/v5"
@@ -28,7 +29,17 @@ func NewHandler(store goreddit.Store) *Handler {
 
 		r.Get("/{id}/new", h.NewPost())
 		r.Post("/{id}", h.CreatePost())
-		r.Get("/{threadID}/{postID}", h.ShowPost())
+	})
+	h.Route("/posts", func(r chi.Router) {
+		r.Get("/{postID}", h.ShowPost())
+		r.Post("/{postID}", h.CreateComment())
+		r.Post("/{id}/upvote", h.UpvotePost())
+		r.Post("/{id}/downvote", h.DownvotePost())
+	})
+
+	h.Route("/comments", func(r chi.Router) {
+		r.Post("/{id}/upvote", h.UpvoteComment())
+		r.Post("/{id}/downvote", h.DownvoteComment())
 	})
 
 	return h
@@ -41,9 +52,22 @@ type Handler struct {
 }
 
 func (h *Handler) Home() http.HandlerFunc {
+	type data struct {
+		Posts []goreddit.Post
+	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
-		templ.Execute(w, nil)
+		ps, err := h.store.Posts()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sort.SliceStable(ps, func(i, j int) bool {
+			return ps[i].Votes > ps[j].Votes
+		})
+
+		templ.Execute(w, data{Posts: ps})
 	}
 }
 
@@ -92,6 +116,10 @@ func (h *Handler) ShowThread() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		sort.SliceStable(ps, func(i, j int) bool {
+			return ps[i].Votes > ps[j].Votes
+		})
 
 		templ.Execute(w, data{
 			Thread: t,
@@ -162,26 +190,14 @@ func (h *Handler) NewPost() http.HandlerFunc {
 
 func (h *Handler) ShowPost() http.HandlerFunc {
 	type data struct {
-		Thread   goreddit.Thread
 		Post     goreddit.Post
 		Comments []goreddit.Comment
 	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/post.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
-		threadID, err := getId(r, "threadID")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 		postID, err := getId(r, "postID")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		t, err := h.store.Thread(threadID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -197,8 +213,11 @@ func (h *Handler) ShowPost() http.HandlerFunc {
 			return
 		}
 
+		sort.SliceStable(cs, func(i, j int) bool {
+			return cs[i].Votes > cs[j].Votes
+		})
+
 		templ.Execute(w, data{
-			Thread:   t,
 			Post:     p,
 			Comments: cs,
 		})
@@ -227,11 +246,106 @@ func (h *Handler) CreatePost() http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, "/threads/"+id.String()+"/"+p.ID.String(), http.StatusFound)
+		http.Redirect(w, r, "/posts/"+p.ID.String(), http.StatusFound)
 	}
+}
+
+func (h *Handler) UpvotePost() http.HandlerFunc {
+	return voteOnPost(h, 1)
+}
+
+func (h *Handler) DownvotePost() http.HandlerFunc {
+	return voteOnPost(h, -1)
+}
+
+func voteOnPost(h *Handler, newVoteAmount int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := getId(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		p, err := h.store.Post(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := h.store.UpdatePost(&goreddit.Post{
+			ID:       p.ID,
+			ThreadID: p.ThreadID,
+			Content:  p.Content,
+			Votes:    p.Votes + newVoteAmount,
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *Handler) CreateComment() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		postID, err := getId(r, "postID")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		content := r.FormValue("content")
+
+		if err := h.store.CreateComment(&goreddit.Comment{
+			ID:      uuid.New(),
+			PostID:  postID,
+			Content: content,
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/posts/"+postID.String(), http.StatusFound)
+	}
+}
+
+func (h *Handler) UpvoteComment() http.HandlerFunc {
+	return voteOnComment(h, 1)
+}
+
+func (h *Handler) DownvoteComment() http.HandlerFunc {
+	return voteOnComment(h, -1)
 }
 
 func getId(r *http.Request, idName string) (uuid.UUID, error) {
 	idStr := chi.URLParam(r, idName)
 	return uuid.Parse(idStr)
+}
+
+func voteOnComment(h *Handler, newVoteAmount int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := getId(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		c, err := h.store.Comment(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := h.store.UpdateComment(&goreddit.Comment{
+			ID:      c.ID,
+			PostID:  c.PostID,
+			Content: c.Content,
+			Votes:   c.Votes + newVoteAmount,
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
