@@ -21,6 +21,7 @@
 <div class="card mb-4">
     <div class="text-right">
         <form action="/posts/{{.Post.ID}}" method="POST">
+            {{.CSRF}}
             <label class="sr-only" for="content">Content</label>
             <textarea
                 id="content"
@@ -53,12 +54,16 @@
 
 {{define "javascript"}}
 <script>
+    const csrfToken = document.getElementsByName("gorilla.csrf.Token")[0].value;
     ['upvote', 'downvote'].forEach(voteType => {
         for (let button of document.getElementsByClassName(voteType)) {
             button.addEventListener('click', (event) => {
                 const id = event.target.dataset.commentId;
                 fetch(`/comments/${id}/${voteType}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': csrfToken,
+                    }
                 }).then(() => {
                     window.location.reload();
                 });

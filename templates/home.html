@@ -46,9 +46,11 @@
         for (let button of document.getElementsByClassName(voteType)) {
             button.addEventListener('click', (event) => {
                 const id = event.target.dataset.postId;
-                console.log(id);
                 fetch(`/posts/${id}/${voteType}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': '{{.CSRFToken}}',
+                    }
                 }).then(() => {
                     window.location.reload();
                 });

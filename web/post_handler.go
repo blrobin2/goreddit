@@ -7,6 +7,7 @@ import (
 
 	"github.com/blrobin2/goreddit"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
 type PostHandler struct {
@@ -15,6 +16,7 @@ type PostHandler struct {
 
 func (h *PostHandler) New() http.HandlerFunc {
 	type data struct {
+		CSRF   template.HTML
 		Thread goreddit.Thread
 	}
 
@@ -33,6 +35,7 @@ func (h *PostHandler) New() http.HandlerFunc {
 		}
 
 		templ.Execute(w, data{
+			CSRF:   csrf.TemplateField(r),
 			Thread: t,
 		})
 	}
@@ -66,6 +69,7 @@ func (h *PostHandler) Create() http.HandlerFunc {
 
 func (h *PostHandler) Show() http.HandlerFunc {
 	type data struct {
+		CSRF     template.HTML
 		Post     goreddit.Post
 		Comments []goreddit.Comment
 	}
@@ -94,6 +98,7 @@ func (h *PostHandler) Show() http.HandlerFunc {
 		})
 
 		templ.Execute(w, data{
+			CSRF:     csrf.TemplateField(r),
 			Post:     p,
 			Comments: cs,
 		})

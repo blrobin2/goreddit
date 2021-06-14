@@ -4,6 +4,7 @@
 
 {{define "content"}}
 <form action="/threads" method="POST">
+    {{.CSRF}}
     <div class="form-group">
         <label for="title">Title</label>
         <input

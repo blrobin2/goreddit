@@ -9,9 +9,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
-func NewHandler(store goreddit.Store) *Handler {
+func NewHandler(store goreddit.Store, csrfKey []byte) *Handler {
 	h := &Handler{
 		Mux:   chi.NewMux(),
 		store: store,
@@ -22,6 +23,7 @@ func NewHandler(store goreddit.Store) *Handler {
 	comments := CommentHandler{store: store}
 
 	h.Use(middleware.Logger)
+	h.Use(csrf.Protect(csrfKey, csrf.Secure(false)))
 
 	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
@@ -57,7 +59,8 @@ type Handler struct {
 
 func (h *Handler) Home() http.HandlerFunc {
 	type data struct {
-		Posts []goreddit.Post
+		CSRFToken string
+		Posts     []goreddit.Post
 	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +74,10 @@ func (h *Handler) Home() http.HandlerFunc {
 			return ps[i].Votes > ps[j].Votes
 		})
 
-		templ.Execute(w, data{Posts: ps})
+		templ.Execute(w, data{
+			CSRFToken: csrf.Token(r),
+			Posts:     ps,
+		})
 	}
 }
 

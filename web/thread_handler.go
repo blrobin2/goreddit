@@ -7,6 +7,7 @@ import (
 
 	"github.com/blrobin2/goreddit"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
 type ThreadHandler struct {
@@ -30,16 +31,22 @@ func (h *ThreadHandler) List() http.HandlerFunc {
 }
 
 func (h *ThreadHandler) New() http.HandlerFunc {
+	type data struct {
+		CSRF template.HTML
+	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/thread_create.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
-		templ.Execute(w, nil)
+		templ.Execute(w, data{
+			CSRF: csrf.TemplateField(r),
+		})
 	}
 }
 
 func (h *ThreadHandler) Show() http.HandlerFunc {
 	type data struct {
-		Thread goreddit.Thread
-		Posts  []goreddit.Post
+		CSRFToken string
+		Thread    goreddit.Thread
+		Posts     []goreddit.Post
 	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/thread.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -64,8 +71,9 @@ func (h *ThreadHandler) Show() http.HandlerFunc {
 		})
 
 		templ.Execute(w, data{
-			Thread: t,
-			Posts:  ps,
+			CSRFToken: csrf.Token(r),
+			Thread:    t,
+			Posts:     ps,
 		})
 	}
 }

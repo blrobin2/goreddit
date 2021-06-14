@@ -56,7 +56,10 @@
         if (confirm('Are you sure? This cannot be undone')) {
             const id = event.target.dataset.threadId;
             fetch(`/threads/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': '{{.CSRFToken}}',
+                }
             }).then(() => {
                 window.location.replace('/threads');
             });
@@ -69,7 +72,10 @@
                 const id = event.target.dataset.postId;
                 console.log(id);
                 fetch(`/posts/${id}/${voteType}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': '{{.CSRFToken}}',
+                    }
                 }).then(() => {
                     window.location.reload();
                 });
