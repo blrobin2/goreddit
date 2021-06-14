@@ -46,21 +46,29 @@ func (h *PostHandler) New() http.HandlerFunc {
 }
 
 func (h *PostHandler) Create() http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		form := CreatePostForm{
+			Title:   r.FormValue("title"),
+			Content: r.FormValue("content"),
+		}
+		if !form.Validate() {
+			h.sessions.Put(r.Context(), "form", form)
+			http.Redirect(w, r, r.Referer(), http.StatusFound)
+			return
+		}
+
 		id, err := getId(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		title := r.FormValue("title")
-		content := r.FormValue("content")
-
 		p := &goreddit.Post{
 			ID:       uuid.New(),
 			ThreadID: id,
-			Title:    title,
-			Content:  content,
+			Title:    form.Title,
+			Content:  form.Content,
 		}
 		if err := h.store.CreatePost(p); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

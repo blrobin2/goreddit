@@ -21,12 +21,19 @@ func (h *CommentHandler) Create() http.HandlerFunc {
 			return
 		}
 
-		content := r.FormValue("content")
+		form := CreateCommentForm{
+			Content: r.FormValue("content"),
+		}
+		if !form.Validate() {
+			h.sessions.Put(r.Context(), "form", form)
+			http.Redirect(w, r, r.Referer(), http.StatusFound)
+			return
+		}
 
 		if err := h.store.CreateComment(&goreddit.Comment{
 			ID:      uuid.New(),
 			PostID:  postID,
-			Content: content,
+			Content: form.Content,
 		}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
