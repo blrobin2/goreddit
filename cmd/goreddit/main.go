@@ -21,6 +21,6 @@ func main() {
 	}
 
 	csrfKey := []byte("01234567890123456789012345678901")
-	h := web.NewHandler(store, sessoions, csrfKey)
+	h := web.NewHandler(store, sessions, csrfKey)
 	http.ListenAndServe(":3000", h)
 }
