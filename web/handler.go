@@ -63,9 +63,11 @@ type Handler struct {
 
 func (h *Handler) Home() http.HandlerFunc {
 	type data struct {
+		SessionData
 		CSRFToken string
 		Posts     []goreddit.Post
 	}
+
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		ps, err := h.store.Posts()
@@ -79,8 +81,9 @@ func (h *Handler) Home() http.HandlerFunc {
 		})
 
 		templ.Execute(w, data{
-			CSRFToken: csrf.Token(r),
-			Posts:     ps,
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			CSRFToken:   csrf.Token(r),
+			Posts:       ps,
 		})
 	}
 }

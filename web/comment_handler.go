@@ -32,6 +32,8 @@ func (h *CommentHandler) Create() http.HandlerFunc {
 			return
 		}
 
+		h.sessions.Put(r.Context(), "flash", "Your comment has been submitted.")
+
 		http.Redirect(w, r, "/posts/"+postID.String(), http.StatusFound)
 	}
 }

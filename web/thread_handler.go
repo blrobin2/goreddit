@@ -18,7 +18,8 @@ type ThreadHandler struct {
 
 func (h *ThreadHandler) List() http.HandlerFunc {
 	type data struct {
-		Threads []goreddit.Thread
+		SessionData SessionData
+		Threads     []goreddit.Thread
 	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/threads.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -28,24 +29,30 @@ func (h *ThreadHandler) List() http.HandlerFunc {
 			return
 		}
 
-		templ.Execute(w, data{Threads: ts})
+		templ.Execute(w, data{
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			Threads:     ts,
+		})
 	}
 }
 
 func (h *ThreadHandler) New() http.HandlerFunc {
 	type data struct {
+		SessionData
 		CSRF template.HTML
 	}
 	templ := template.Must(template.ParseFiles("templates/layout.html", "templates/thread_create.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		templ.Execute(w, data{
-			CSRF: csrf.TemplateField(r),
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			CSRF:        csrf.TemplateField(r),
 		})
 	}
 }
 
 func (h *ThreadHandler) Show() http.HandlerFunc {
 	type data struct {
+		SessionData
 		CSRFToken string
 		Thread    goreddit.Thread
 		Posts     []goreddit.Post
@@ -73,9 +80,10 @@ func (h *ThreadHandler) Show() http.HandlerFunc {
 		})
 
 		templ.Execute(w, data{
-			CSRFToken: csrf.Token(r),
-			Thread:    t,
-			Posts:     ps,
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			CSRFToken:   csrf.Token(r),
+			Thread:      t,
+			Posts:       ps,
 		})
 	}
 }
@@ -94,6 +102,8 @@ func (h *ThreadHandler) Create() http.HandlerFunc {
 			return
 		}
 
+		h.sessions.Put(r.Context(), "flash", "Your thread has been created.")
+
 		http.Redirect(w, r, "/threads", http.StatusFound)
 	}
 }
@@ -110,6 +120,8 @@ func (h *ThreadHandler) Delete() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		h.sessions.Put(r.Context(), "flash", "Your thread has been deleted.")
 
 		w.WriteHeader(http.StatusNoContent)
 	}
