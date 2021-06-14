@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/blrobin2/goreddit"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 )
 
 type PostHandler struct {
-	store goreddit.Store
+	store    goreddit.Store
+	sessions *scs.SessionManager
 }
 
 func (h *PostHandler) New() http.HandlerFunc {

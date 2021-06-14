@@ -3,12 +3,14 @@ package web
 import (
 	"net/http"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/blrobin2/goreddit"
 	"github.com/google/uuid"
 )
 
 type CommentHandler struct {
-	store goreddit.Store
+	store    goreddit.Store
+	sessions *scs.SessionManager
 }
 
 func (h *CommentHandler) Create() http.HandlerFunc {
