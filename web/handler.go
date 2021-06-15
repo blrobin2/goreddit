@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"sort"
@@ -28,6 +29,7 @@ func NewHandler(store goreddit.Store, sessions *scs.SessionManager, csrfKey []by
 	h.Use(middleware.Logger)
 	h.Use(csrf.Protect(csrfKey, csrf.Secure(false)))
 	h.Use(sessions.LoadAndSave)
+	h.Use(h.withUser)
 
 	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
@@ -53,6 +55,9 @@ func NewHandler(store goreddit.Store, sessions *scs.SessionManager, csrfKey []by
 	})
 	h.Get("/register", users.New())
 	h.Post("/register", users.Register())
+	h.Get("/login", users.LoginForm())
+	h.Post("/login", users.Login())
+	h.Get("/logout", users.Logout())
 
 	return h
 }
@@ -94,4 +99,19 @@ func (h *Handler) Home() http.HandlerFunc {
 func getId(r *http.Request, idName string) (uuid.UUID, error) {
 	idStr := chi.URLParam(r, idName)
 	return uuid.Parse(idStr)
+}
+
+func (h *Handler) withUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, _ := h.sessions.Get(r.Context(), "user_id").(uuid.UUID)
+
+		user, err := h.store.User(id)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), KeyUserID, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

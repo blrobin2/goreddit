@@ -7,6 +7,7 @@ func init() {
 	gob.Register(CreateThreadForm{})
 	gob.Register(CreateCommentForm{})
 	gob.Register(RegisterUserForm{})
+	gob.Register(LoginUserForm{})
 	gob.Register(FormErrors{})
 }
 
@@ -90,6 +91,28 @@ func (f *RegisterUserForm) Validate() bool {
 		f.Errors["PasswordConfirm"] = "Please enter the same password."
 	} else if f.Password != f.PasswordConfirm {
 		f.Errors["PasswordConfirm"] = "Password confirmation does not match."
+	}
+
+	return len(f.Errors) == 0
+}
+
+type LoginUserForm struct {
+	Username                  string
+	Password                  string
+	InvalidUsernameOrPassword bool
+
+	Errors FormErrors
+}
+
+func (f *LoginUserForm) Validate() bool {
+	f.Errors = FormErrors{}
+	if f.Username == "" {
+		f.Errors["Username"] = "Please enter a username."
+	} else if f.InvalidUsernameOrPassword {
+		f.Errors["Username"] = "Username or password is incorrect."
+	}
+	if f.Password == "" {
+		f.Errors["Password"] = "Please enter a password."
 	}
 
 	return len(f.Errors) == 0
