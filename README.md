@@ -10,6 +10,7 @@ A small Reddit clone for learning purposes
 ## Prequisites
 
 The following packages must be installed globally:
+* [Docker](https://www.docker.com/)
 * [Go](https://golang.org/)
 * [migrate](https://github.com/golang-migrate/migrate)
 * [reflex](https://github.com/cespare/reflex)
