@@ -31,7 +31,6 @@ type SessionData struct {
 	FlashMessage string
 	Form         interface{}
 	User         goreddit.User
-	CSRFToken    string
 	LoggedIn     bool
 }
 
